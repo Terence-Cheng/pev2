@@ -27,14 +27,12 @@ import type {
 } from "@/interfaces"
 import Copy from "@/components/Copy.vue"
 import Diagram from "@/components/Diagram.vue"
-import type PlanNode from "@/components/PlanNode.vue"
 import PlanNodeContainer from "@/components/PlanNodeContainer.vue"
 import Stats from "@/components/Stats.vue"
-import { scrollChildIntoParentView } from "@/services/help-service"
 import { PlanService } from "@/services/plan-service"
 import { HelpService } from "@/services/help-service"
 import Dragscroll from "@/dragscroll"
-import { CenterMode, HighlightMode, HighlightType, NodeProp } from "@/enums"
+import { HighlightType, NodeProp } from "@/enums"
 import { duration, durationClass, json_, pgsql_ } from "@/filters"
 
 import "tippy.js/dist/tippy.css"
@@ -70,7 +68,6 @@ const showSettings = ref<boolean>(false)
 const showTriggers = ref<boolean>(false)
 const selectedNode = ref<number>(NaN)
 const highlightedNode = ref<number>(NaN)
-const planNodes: { [key: number]: typeof PlanNode } = {}
 
 const emitter = mitt<Events>()
 
@@ -104,7 +101,7 @@ const zoomListener = d3
 const nodeSize: [number, number] = [200, 40 + padding]
 const layoutRootNode = ref<null | d3.HierarchyPointNode<Node>>(null)
 // computed position + rootNode
-const ctes = ref<[[number, number], d3.HierarchyPointNode<Node>][]>([])
+const ctes = ref<d3.HierarchyPointNode<Node>[]>([])
 const toCteLinks = ref<d3.HierarchyPointLink<Node>[]>([])
 
 onBeforeMount(() => {
@@ -143,13 +140,10 @@ onBeforeMount(() => {
 
   nextTick(() => {
     let nodeId = 1
-    let highlightMode = HighlightMode.flash
     if (zoomTo.value) {
       nodeId = zoomTo.value
-      // tslint:disable-next-line:no-bitwise
-      highlightMode = HighlightMode.highlight | HighlightMode.showdetails
     }
-    centerNode(nodeId, CenterMode.visible, highlightMode)
+    centerNode(nodeId)
     // build the diagram structure
     // with level and reference to PlanNode components for interaction
     if (!plan.value) {
@@ -168,23 +162,24 @@ onBeforeMount(() => {
     d3.hierarchy(planJson.Plan, (v: Node) => v.Plans)
   )
 
+  const mainLayoutExtent = getLayoutExtent(layoutRootNode.value)
+  const offset: [number, number] = [
+    mainLayoutExtent[0],
+    mainLayoutExtent[3] + 150,
+  ]
   _.each(plan.value.ctes, (cte) => {
     if (!layoutRootNode.value) {
       return
     }
-    const mainLayoutExtent = getLayoutExtent(layoutRootNode.value)
     const cteRootNode = layout(d3.hierarchy(cte, (v: Node) => v.Plans))
     const currentCteExtent = getLayoutExtent(cteRootNode)
-    const position: [number, number] = [
-      mainLayoutExtent[0] - currentCteExtent[0],
-      mainLayoutExtent[3] + 150,
-    ]
-    // loop through previous ctes
-    _.each(ctes.value, (cte) => {
-      const extent = getLayoutExtent(cte[1])
-      position[0] += extent[1] - extent[0] + nodeSize[0] + padding * 2
+    const currentWidth = currentCteExtent[1] - currentCteExtent[0]
+    ctes.value.push(cteRootNode)
+    cteRootNode.each((node) => {
+      node.x += offset[0] + currentWidth / 2
+      node.y += offset[1]
     })
-    ctes.value.push([position, cteRootNode])
+    offset[0] += currentWidth + nodeSize[0] + padding * 2
   })
 
   // compute links from node to CTE
@@ -192,17 +187,14 @@ onBeforeMount(() => {
     if (_.has(source.data, NodeProp.CTE_NAME)) {
       const cte = _.find(ctes.value, (cteNode) => {
         return (
-          cteNode[1].data[NodeProp.SUBPLAN_NAME] ==
+          cteNode.data[NodeProp.SUBPLAN_NAME] ==
           "CTE " + source.data[NodeProp.CTE_NAME]
         )
       })
       if (cte) {
-        const target = cte[1].copy()
-        target.x = cte[0][0]
-        target.y = cte[0][1]
         toCteLinks.value.push({
           source: source,
-          target: target,
+          target: cte,
         })
       }
     }
@@ -210,24 +202,18 @@ onBeforeMount(() => {
 
   // compute links from node in CTE to other CTE
   _.each(ctes.value, (cte) => {
-    _.each(cte[1].descendants(), (sourceCte) => {
+    _.each(cte.descendants(), (sourceCte) => {
       if (_.has(sourceCte.data, NodeProp.CTE_NAME)) {
         const targetCte = _.find(ctes.value, (cteNode) => {
           return (
-            cteNode[1].data[NodeProp.SUBPLAN_NAME] ==
+            cteNode.data[NodeProp.SUBPLAN_NAME] ==
             "CTE " + sourceCte.data[NodeProp.CTE_NAME]
           )
         })
         if (targetCte) {
-          const source = sourceCte.copy()
-          source.x = sourceCte.x + cte[0][0]
-          source.y = sourceCte.y + cte[0][1]
-          const target = targetCte[1].copy()
-          target.x = targetCte[0][0]
-          target.y = targetCte[0][1]
           toCteLinks.value.push({
-            source: source,
-            target: target,
+            source: sourceCte,
+            target: targetCte,
           })
         }
       }
@@ -237,7 +223,6 @@ onBeforeMount(() => {
 
 onMounted(() => {
   handleScroll()
-  emitter.on("clickcte", onClickCte)
   d3.select(planEl.value.$el).call(zoomListener)
   nextTick(() => {
     const rect = planEl.value.$el.getBoundingClientRect()
@@ -291,67 +276,40 @@ function onHashChange(): void {
   }
 }
 
-// Register a PlanNode component by its id
-function registerNode(node: typeof PlanNode) {
-  planNodes[node.props.node.nodeId] = node
-}
-
-provide("register", registerNode)
 provide("selectedNode", selectedNode)
 provide("highlightedNode", highlightedNode)
 provide("emitter", emitter)
 
 function selectNode(nodeId: number) {
   selectedNode.value = nodeId
-  centerNode(nodeId, CenterMode.visible, HighlightMode.highlight)
+  centerNode(nodeId)
 }
 
-function centerNode(
-  nodeId: number,
-  centerMode: CenterMode,
-  highlightMode: HighlightMode
-): void {
-  const cmp = planNodes[nodeId]
-  if (cmp) {
-    highlightEl(cmp.refs.el, centerMode, highlightMode)
-    // tslint:disable-next-line:no-bitwise
-    if (highlightMode & HighlightMode.showdetails) {
-      cmp.setShowDetails(true)
-    }
-  }
-}
-
-function highlightEl(
-  el: Element | HTMLElement | null,
-  centerMode: CenterMode,
-  highlightMode: HighlightMode
-) {
-  if (!el) {
+function centerNode(nodeId: number): void {
+  const rect = planEl.value.$el.getBoundingClientRect()
+  const treeNode = findTreeNode(nodeId)
+  if (!treeNode) {
     return
   }
-  const parent = planEl.value.$el
-  if (centerMode !== CenterMode.none) {
-    scrollChildIntoParentView(
-      parent,
-      el,
-      centerMode === CenterMode.center,
-      () => {
-        // tslint:disable-next-line:no-bitwise
-        if (highlightMode & HighlightMode.flash) {
-          el.classList.add("flash")
-          setTimeout(() => {
-            el.classList.remove("flash")
-          }, 1000)
-        }
-        /*
-        // tslint:disable-next-line:no-bitwise
-        if (highlightMode & HighlightMode.highlight) {
-          el.classList.add("highlight")
-        }
-        */
-      }
-    )
-  }
+  let x = -treeNode["x"]
+  let y = -treeNode["y"]
+  let k = scale.value
+  x = x * k + rect.width / 2
+  y = y * k + rect.height / 2
+  d3.select(planEl.value.$el)
+    .transition()
+    .duration(500)
+    .call(zoomListener.transform, d3.zoomIdentity.translate(x, y).scale(k))
+}
+
+function findTreeNode(nodeId: number) {
+  const trees = [layoutRootNode.value].concat(ctes.value)
+  let found: undefined | d3.HierarchyPointNode<Node> = undefined
+  _.each(trees, (tree) => {
+    found = _.find(tree?.descendants(), (o) => o.data.nodeId == nodeId)
+    return !found
+  })
+  return found
 }
 
 const setActiveTab = (tab: string) => {
@@ -395,16 +353,6 @@ function handleScroll(): void {
   }
   const el: Element = planEl.value.$el as Element
   new Dragscroll(el)
-}
-
-function onClickCte(subplanName: string): void {
-  const cmp = _.find(planNodes, (o) => {
-    return (
-      o.props.node[NodeProp.SUBPLAN_NAME] &&
-      o.props.node[NodeProp.SUBPLAN_NAME] == subplanName
-    )
-  })
-  cmp && highlightEl(cmp.refs.outerEl, CenterMode.visible, HighlightMode.flash)
 }
 
 function getLayoutExtent(
@@ -747,6 +695,8 @@ function getLayoutExtent(
                       <plan-node-container
                         v-for="(item, index) in layoutRootNode?.descendants()"
                         :key="index"
+                        :x="item.x"
+                        :y="item.y"
                         :node="item"
                         :plan="plan"
                         :viewOptions="viewOptions"
@@ -754,21 +704,21 @@ function getLayoutExtent(
                         height="1"
                         ref="root"
                       ></plan-node-container>
-                      <g
-                        v-for="cte in ctes"
-                        :key="cte[1].data.nodeId"
-                        :transform="`translate(${cte[0][0]}, ${cte[0][1]})`"
-                      >
+                      <g v-for="cte in ctes" :key="cte.data.nodeId">
                         <rect
-                          :x="getLayoutExtent(cte[1])[0] - padding / 4"
-                          :y="-padding / 2"
+                          :x="getLayoutExtent(cte)[0] - padding / 4"
+                          :y="getLayoutExtent(cte)[2] - padding / 2"
                           :width="
-                            getLayoutExtent(cte[1])[1] +
+                            getLayoutExtent(cte)[1] +
                             nodeSize[0] -
-                            getLayoutExtent(cte[1])[0] +
+                            getLayoutExtent(cte)[0] +
                             padding / 2
                           "
-                          :height="getLayoutExtent(cte[1])[3] + nodeSize[1]"
+                          :height="
+                            getLayoutExtent(cte)[3] -
+                            getLayoutExtent(cte)[2] +
+                            nodeSize[1]
+                          "
                           stroke="#cfcfcf"
                           stroke-width="2"
                           fill="#cfcfcf"
@@ -777,7 +727,7 @@ function getLayoutExtent(
                           ry="5"
                         ></rect>
                         <path
-                          v-for="(link, index) in cte[1].links()"
+                          v-for="(link, index) in cte.links()"
                           :key="`link${index}`"
                           :d="lineGen(link)"
                           stroke="grey"
@@ -788,7 +738,9 @@ function getLayoutExtent(
                           fill="none"
                         />
                         <plan-node-container
-                          v-for="(item, index) in cte[1].descendants()"
+                          v-for="(item, index) in cte.descendants()"
+                          :x="item.x"
+                          :y="item.y"
                           :key="index"
                           :node="item"
                           :plan="plan"
