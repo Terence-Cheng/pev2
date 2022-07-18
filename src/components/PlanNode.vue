@@ -81,7 +81,7 @@ onMounted(async () => {
     allowHTML: true,
     interactive: true,
     appendTo: () => document.body,
-    placement: "right",
+    placement: "top",
     maxWidth: "none",
     arrow: false,
     theme: "no-background",
