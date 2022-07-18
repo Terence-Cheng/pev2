@@ -80,6 +80,7 @@ onMounted(async () => {
     maxWidth: "none",
     arrow: false,
     theme: "no-background",
+    delay: [200, null],
   })
 })
 
