@@ -416,7 +416,7 @@ const isNeverExecuted = computed((): boolean => {
               >
                 <font-awesome-icon
                   fixed-width
-                  class="exchange-alt"
+                  icon="exchange-alt"
                 ></font-awesome-icon>
               </span>
               <span
