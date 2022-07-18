@@ -34,13 +34,7 @@ import { scrollChildIntoParentView } from "@/services/help-service"
 import { PlanService } from "@/services/plan-service"
 import { HelpService } from "@/services/help-service"
 import Dragscroll from "@/dragscroll"
-import {
-  CenterMode,
-  HighlightMode,
-  HighlightType,
-  NodeProp,
-  Orientation,
-} from "@/enums"
+import { CenterMode, HighlightMode, HighlightType, NodeProp } from "@/enums"
 import { duration, durationClass, json_, pgsql_ } from "@/filters"
 
 import "tippy.js/dist/tippy.css"
@@ -85,7 +79,6 @@ const viewOptions = reactive({
   showHighlightBar: false,
   showPlanStats: true,
   highlightType: HighlightType.NONE,
-  orientation: Orientation.TWOD,
   showDiagram: true,
   diagramWidth: 20,
 })
@@ -514,10 +507,7 @@ function getLayoutExtent(
         v-if="!validationMessage"
       >
         <!-- Plan tab -->
-        <div
-          class="d-flex flex-column flex-grow-1 overflow-hidden"
-          :class="[viewOptions.orientation]"
-        >
+        <div class="d-flex flex-column flex-grow-1 overflow-hidden">
           <div
             class="plan-stats flex-shrink-0 d-flex border-bottom border-top form-inline"
             v-if="plan"
@@ -836,32 +826,6 @@ function getLayoutExtent(
                   ><font-awesome-icon icon="align-left"></font-awesome-icon>
                   Diagram</label
                 >
-              </div>
-              <hr />
-              <label class="text-uppercase">Orientation</label>
-              <div class="form-group">
-                <div class="btn-group btn-group-sm">
-                  <button
-                    class="btn btn-outline-secondary"
-                    :class="{
-                      active: viewOptions.orientation == Orientation.TWOD,
-                    }"
-                    v-on:click="viewOptions.orientation = Orientation.TWOD"
-                  >
-                    <font-awesome-icon icon="sitemap"></font-awesome-icon>
-                    2D
-                  </button>
-                  <button
-                    class="btn btn-outline-secondary"
-                    :class="{
-                      active: viewOptions.orientation == Orientation.CLASSIC,
-                    }"
-                    v-on:click="viewOptions.orientation = Orientation.CLASSIC"
-                  >
-                    <font-awesome-icon icon="list"></font-awesome-icon>
-                    classic
-                  </button>
-                </div>
               </div>
               <hr />
               <label class="text-uppercase">Graph metric</label>
