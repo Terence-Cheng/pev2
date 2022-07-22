@@ -1,7 +1,6 @@
 <script lang="ts" setup>
 import {
   computed,
-  getCurrentInstance,
   h,
   inject,
   onBeforeMount,
