@@ -33,6 +33,7 @@ import {
 } from "@/enums"
 import * as _ from "lodash"
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome"
+// import Popper from "vue3-popper"
 
 type registerFn = {
   (node: object): void
@@ -61,6 +62,12 @@ const nodeProps = ref<
     value: unknown
   }[]
 >()
+
+interface Commments {
+  [key: number]: string
+}
+
+const commments = reactive<Commments>({})
 
 const executionTimePercent = ref<number>(NaN)
 // UI flags
@@ -457,6 +464,13 @@ function formattedProp(propName: keyof typeof NodeProp) {
   const value = node[property]
   return formatNodeProp(property, value)
 }
+function handleCommentClick() {
+  console.log("card click", node.nodeId)
+  const comment = prompt("Please enter your comment")
+  if (comment) {
+    commments[node.nodeId] = comment
+  }
+}
 </script>
 
 <template>
@@ -501,7 +515,7 @@ function formattedProp(propName: keyof typeof NodeProp) {
         </div>
       </div>
       <div
-        class="collapse-handle"
+        :class="['collapse-handle', { 'children-collapsed': collapsed }]"
         v-if="hasChildren"
         v-on:click.stop="collapsed = !collapsed"
       >
@@ -519,7 +533,7 @@ function formattedProp(propName: keyof typeof NodeProp) {
         ></font-awesome-icon>
       </div>
       <div
-        class="plan-node-body card"
+        :class="['plan-node-body card', { 'node-body-collapsed': collapsed }]"
         @mouseenter="highlightedNode = node.nodeId"
         @mouseleave="highlightedNode = null"
       >
@@ -532,7 +546,7 @@ function formattedProp(propName: keyof typeof NodeProp) {
               <a
                 class="font-weight-normal small"
                 :href="'#plan/node/' + node.nodeId"
-                @click.stop
+                @click.stop.prevent
                 >#{{ node.nodeId }}</a
               >
               {{ getNodeName() }}
@@ -612,6 +626,20 @@ function formattedProp(propName: keyof typeof NodeProp) {
                   icon="filter"
                   class="text-muted"
                 ></font-awesome-icon>
+              </span>
+              <span
+                class="p-0 d-inline-block mb-0 ml-1 text-nowrap"
+                v-tippy="{
+                  content: commments[node.nodeId],
+                  placement: 'bottom',
+                }"
+              >
+                <font-awesome-icon
+                  fixed-width
+                  icon="fa-solid fa-comment"
+                  class="text-muted"
+                  v-on:click.stop="handleCommentClick"
+                />
               </span>
             </div>
             <span v-if="viewOptions.viewMode === ViewMode.FULL">
@@ -1185,7 +1213,7 @@ function formattedProp(propName: keyof typeof NodeProp) {
         </div>
       </div>
     </div>
-    <ul v-if="plans" :class="['node-children', { collapsed: collapsed }]">
+    <ul v-if="plans && !collapsed" class="node-children">
       <li v-for="subnode in plans" :key="subnode.nodeId">
         <plan-node :node="subnode" :plan="plan" :viewOptions="viewOptions">
         </plan-node>

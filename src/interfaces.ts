@@ -137,6 +137,7 @@ export class Node {
       type
     )
     const subqueryMatches = /^(Subquery\sScan)\son\s(.+)$/.exec(type)
+    const motionMatches = /^([a-zA-z]+\sMotion)\s(.+)$/.exec(type)
     if (scanMatches) {
       this[NodeProp.NODE_TYPE] = scanMatches[1]
       this[NodeProp.RELATION_NAME] = scanMatches[2]
@@ -168,6 +169,8 @@ export class Node {
     } else if (subqueryMatches) {
       this[NodeProp.NODE_TYPE] = subqueryMatches[1]
       // this[NodeProp.SUBQUERY_NAME] = subqueryMatches[2].replace
+    } else if (motionMatches) {
+      this[NodeProp.NODE_TYPE] = motionMatches[1]
     }
     const parallelMatches = /^(Parallel\s+)(.*)/.exec(
       <string>this[NodeProp.NODE_TYPE]

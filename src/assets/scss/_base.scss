@@ -106,3 +106,14 @@ $buffers-colors: (
   text-overflow: ellipsis;
   overflow: hidden;
 }
+a {
+  color: $teal;
+}
+.nav-link.active {
+  background-color: $teal !important;
+}
+
+.btn-primary {
+  background-color: $teal;
+  border-color: $teal;
+}

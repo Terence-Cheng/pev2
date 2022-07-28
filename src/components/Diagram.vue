@@ -464,6 +464,7 @@ function setRowRef(nodeId: number, el: Element) {
                 <a
                   class="font-weight-normal small"
                   :href="'#plan/node/' + row[1].nodeId"
+                  @click.stop.prevent
                   >#{{ row[1].nodeId }}</a
                 >
               </td>

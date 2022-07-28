@@ -1,28 +1,9 @@
 <script lang="ts" setup>
 import { inject, ref, onMounted } from "vue"
 import MainLayout from "../layouts/MainLayout.vue"
-import {
-  plan1_source,
-  plan1_source_json,
-  plan1_query,
-  plan2_source,
-  plan2_query,
-  plan3_source,
-  plan3_query,
-  plan4_source,
-  plan5_source,
-  plan5_query,
-  plan6_source,
-  plan7_source,
-  plan8_source,
-  plan_parallel_source,
-  plan_parallel_2_source,
-  plan_parallel_2_query,
-  plan_trigger_source,
-  plan_trigger_query,
-  plan_trigger_2_source,
-  plan_trigger_2_query,
-} from "../samples.ts"
+import { useRouter, useRoute } from "vue-router"
+
+const router = useRouter()
 
 const setPlanData = inject("setPlanData")
 
@@ -30,6 +11,7 @@ const planInput = ref<string>("")
 const queryInput = ref<string>("")
 const draggingPlan = ref<boolean>(false)
 const draggingQuery = ref<boolean>(false)
+const urlBase = "http://10.117.190.170:1323"
 
 interface Sample extends Array<string> {
   0: string
@@ -37,24 +19,38 @@ interface Sample extends Array<string> {
   2: string
 }
 
-const samples = ref<Sample[]>([
-  ["Example 1 TEXT", plan1_source, plan1_query],
-  ["Example 1 JSON", plan1_source_json, plan1_query],
-  ["Example 2", plan2_source, plan2_query],
-  ["Example 3", plan3_source, plan3_query],
-  ["Example 4", plan4_source, ""],
-  ["Example 5", plan5_source, plan5_query],
-  ["With subplan", plan6_source, ""],
-  ["With CTE", plan7_source, ""],
-  ["Very large plan", plan8_source, ""],
-  ["With trigger", plan_trigger_2_source, plan_trigger_2_query],
-  ["With trigger (plain text)", plan_trigger_source, plan_trigger_query],
-  ["Parallel (verbose)", plan_parallel_source, ""],
-  ["Parallel (4 workers)", plan_parallel_2_source, plan_parallel_2_query],
-])
+async function fetchData(url = "", method = "GET", data = []) {
+  const response = await fetch(url, {
+    method: method,
+    body: JSON.stringify(data),
+    headers: {
+      "Content-Type": "application/json",
+    },
+  })
+  return response.json()
+}
 
 function submitPlan() {
-  setPlanData(planInput.value, queryInput.value)
+  try {
+    const testData = {
+      planA: planInput.value,
+      planB: queryInput.value,
+    }
+    fetchData(`${urlBase}/submit`, "POST", testData)
+    .then((data) => {
+      console.log(data)
+      setPlanData(planInput.value, queryInput.value)
+      router.push({ path: "/plan", query: { IDA: data.IDA, IDB: data.IDB || undefined } })
+    })
+    .catch(error => {
+        setPlanData(planInput.value, queryInput.value)
+        router.push("/plan")
+    })
+  } catch (error) {
+    setPlanData(planInput.value, queryInput.value)
+    router.push("/plan")
+    throw new Error(error)
+  }
 }
 
 onMounted(() => {
@@ -65,11 +61,6 @@ onMounted(() => {
   const noHashURL = window.location.href.replace(/#.*$/, "")
   window.history.replaceState("", document.title, noHashURL)
 })
-
-function loadSample(sample: Sample) {
-  planInput.value = sample[1]
-  queryInput.value = sample[2]
-}
 
 function handleDrop(event: DragEvent) {
   const input = event.srcElement
@@ -97,55 +88,10 @@ function handleDrop(event: DragEvent) {
 <template>
   <main-layout>
     <div class="container">
-      <div class="alert alert-warning">
-        This is the demo application for
-        <a href="https://github.com/dalibo/pev2">PEV2</a>. It is serverless and
-        doesn't store your plans.
-        <br />
-        Please consider using
-        <a href="https://explain.dalibo.com">explain.dalibo.com</a> instead if
-        you want to save or share your plans.
-      </div>
-      <div class="row">
-        <div class="col d-flex">
-          <div class="text-muted">
-            For best results, use
-            <code>
-              EXPLAIN (ANALYZE, COSTS, VERBOSE, BUFFERS, FORMAT JSON)
-            </code>
-            <br />
-            <em>psql</em> users can export the plan to a file using
-            <code>psql -XqAt -f explain.sql > analyze.json</code>
-          </div>
-          <div class="dropdown ml-auto">
-            <button
-              class="btn btn-secondary dropdown-toggle"
-              type="button"
-              id="dropdownMenuButton"
-              data-toggle="dropdown"
-              aria-haspopup="true"
-              aria-expanded="false"
-            >
-              Sample Plans
-            </button>
-            <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
-              <a
-                v-for="(sample, index) in samples"
-                :key="index"
-                class="dropdown-item"
-                v-on:click.prevent="loadSample(sample)"
-                href
-              >
-                {{ sample[0] }}
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
       <form v-on:submit.prevent="submitPlan">
         <div class="form-group">
           <label for="planInput">
-            Plan <span class="small text-muted">(text or JSON)</span>
+            Plan #1 <span class="small text-muted">(text or JSON)</span>
           </label>
           <textarea
             :class="['form-control', draggingPlan ? 'dropzone-over' : '']"
@@ -161,7 +107,8 @@ function handleDrop(event: DragEvent) {
         </div>
         <div class="form-group">
           <label for="queryInput">
-            Query <span class="small text-muted">(optional)</span>
+            Plan #2
+            <span class="small text-muted">(text or JSON, optional)</span>
           </label>
           <textarea
             :class="['form-control', draggingQuery ? 'dropzone-over' : '']"
@@ -171,7 +118,7 @@ function handleDrop(event: DragEvent) {
             @dragenter="draggingQuery = true"
             @dragleave="draggingQuery = false"
             @drop.prevent="handleDrop"
-            placeholder="Paste corresponding SQL query\nOr drop a file"
+            placeholder="Paste execution plan\nOr drop a file"
           >
           </textarea>
         </div>

@@ -490,6 +490,11 @@ export class PlanService {
       const prefixRegex = "^(\\s*->\\s*|\\s*)"
       const typeRegex = "([^\\r\\n\\t\\f\\v\\:\\(]*?)"
       // tslint:disable-next-line:max-line-length
+      const motionRegex =
+        "\\(cost=(\\d+\\.\\d+)\\.\\.(\\d+\\.\\d+)\\s+rows=(\\d+)\\s+width=(\\d+)\\)"
+      // Gather|Diestribute|BoradCas Motion 64:1  (slice4; segments: 64)  (cost=69869958.4
+      //->  Hash Join  (cost=1838623.09..12579665.08 rows=897650951 width=172)
+      // tslint:disable-next-line:max-line-length
       const estimationRegex =
         "\\(cost=(\\d+\\.\\d+)\\.\\.(\\d+\\.\\d+)\\s+rows=(\\d+)\\s+width=(\\d+)\\)"
       const nonCapturingGroupOpen = "(?:"

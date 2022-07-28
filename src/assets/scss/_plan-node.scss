@@ -30,6 +30,9 @@ $bg-color: #fff;
     border-radius: $border-radius-base;
     background-color: $plan-node-bg;
     box-shadow: 1px 1px 3px 0px rgba(0,0,0,0.1);
+    &.node-body-collapsed {
+      box-shadow: 1px 1px 3px 0px rgba(0, 0, 0, 0.91);
+    }
     cursor: auto;
 
     .header.card-body {
@@ -161,6 +164,9 @@ $bg-color: #fff;
     right: 0;
     display: none;
     background-color: rgba(255, 255, 255, 0.7);
+    &.children-collapsed {
+      display: block;
+    }
   }
 
   &:hover .collapse-handle {

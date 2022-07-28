@@ -4,10 +4,7 @@ import VLink from "../components/VLink.vue"
 
 <template>
   <div class="d-flex flex-column vh-100">
-    <div class="navbar container">
-      <v-link class="btn btn-secondary ml-auto" to="/">New Plan</v-link>
-      <v-link class="btn btn-link" to="/about">About</v-link>
-    </div>
+    <div class="navbar container"></div>
     <slot></slot>
   </div>
 </template>
